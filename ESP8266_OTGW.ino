@@ -128,7 +128,7 @@ String get_net_info() {
 }
 
 void connect_to_wifi() {
-  // https://github.com/arendst/Sonoff-Tasmota/blob/development/sonoff/support_wifi.ino#L191
+  // https://github.com/arendst/Sonoff-Tasmota/blob/development/sonoff/support_wifi.ino#L210
   WiFi.persistent(false);
   WiFi.disconnect(true);
   delay(200);
@@ -195,8 +195,9 @@ void handle_server_clients(WiFiServer server, WiFiClient clients[]) {
   }
 }
 
+// https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266httpUpdate/examples/httpUpdate/httpUpdate.ino
 void do_http_update(WiFiClient client) {
-#ifdef ARDUINO_ESP8266_RELEASE
+#ifdef ARDUINO_ESP8266_RELEASE_2_4_2
   t_httpUpdate_return ret = ESPhttpUpdate.update(esp_update_url);
 #else
   WiFiClient OTAclient;
@@ -244,7 +245,7 @@ void parse_esp_cmd(WiFiClient client) {
   if (cmd.equals(PSTR("$VER"))) {
     client.println(ESP.getFullVersion());
   } else if (cmd.equals(PSTR("$MEM"))) {
-#ifdef ARDUINO_ESP8266_RELEASE
+#ifdef ARDUINO_ESP8266_RELEASE_2_4_2
     client.printf_P(PSTR("Free: %d bytes%s"), ESP.getFreeHeap(), FPSTR(EOL));
 #else
     client.printf_P(PSTR("Free: %d bytes Fragmentation: %d%%%s"), ESP.getFreeHeap(), ESP.getHeapFragmentation(), FPSTR(EOL));
