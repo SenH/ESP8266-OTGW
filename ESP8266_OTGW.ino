@@ -36,6 +36,9 @@
   #define s_trig_reset_wd_i2c(x)
 #endif
 
+// Retrieve const char* from PROGMEM pointer
+#define FPCC(x) (String(FPSTR(x)).c_str())
+
 // 
 // GLOBALS
 // 
@@ -136,9 +139,13 @@ void connect_to_wifi() {
   WiFi.mode(WIFI_STA);
   WiFi.setSleepMode(WIFI_NONE_SLEEP);
 #ifdef WIFI_BSSID
-  WiFi.begin(wifi_ssid, wifi_password, wifi_channel, wifi_bssid);
+  uint8_t *bssid = new uint8_t[6];
+  if (bssid) {
+    memcpy_P(bssid, wifi_bssid, 6);
+  }
+  WiFi.begin(FPCC(wifi_ssid), FPCC(wifi_password), wifi_channel, bssid);
 #else
-  WiFi.begin(wifi_ssid, wifi_password);
+  WiFi.begin(FPCC(wifi_ssid), FPCC(wifi_password));
 #endif
 #ifdef STATIC_IP
   WiFi.config(host, gateway, netmask, dns1);
@@ -198,17 +205,17 @@ void handle_server_clients(WiFiServer server, WiFiClient clients[]) {
 // https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266httpUpdate/examples/httpUpdate/httpUpdate.ino
 void do_http_update(WiFiClient client) {
 #ifdef ARDUINO_ESP8266_RELEASE_2_4_2
-  t_httpUpdate_return ret = ESPhttpUpdate.update(esp_update_url);
+  t_httpUpdate_return ret = ESPhttpUpdate.update(FPCC(esp_update_url));
 #else
   WiFiClient OTAclient;
   ESPhttpUpdate.setLedPin(node_led_pin, LOW);
-  t_httpUpdate_return ret = ESPhttpUpdate.update(OTAclient, esp_update_url);
+  t_httpUpdate_return ret = ESPhttpUpdate.update(OTAclient, FPCC(esp_update_url));
 #endif
   
   switch (ret) {
     case HTTP_UPDATE_FAILED:
     client.printf_P(PSTR("HTTP update error %d, %s%s"), ESPhttpUpdate.getLastError(), 
-      ESPhttpUpdate.getLastErrorString().c_str(), FPSTR(EOL));
+      ESPhttpUpdate.getLastErrorString().c_str(), FPCC(EOL));
     break;
 
     case HTTP_UPDATE_NO_UPDATES:
@@ -242,36 +249,38 @@ void parse_esp_cmd(WiFiClient client) {
     return;
   }
   
-  if (cmd.equals(PSTR("$VER"))) {
+  if (cmd.equals(F("$VER"))) {
     client.println(ESP.getFullVersion());
-  } else if (cmd.equals(PSTR("$MEM"))) {
+    client.print(F("ESP restart reason: "));
+    client.println(ESP.getResetReason());
+  } else if (cmd.equals(F("$MEM"))) {
 #ifdef ARDUINO_ESP8266_RELEASE_2_4_2
-    client.printf_P(PSTR("Free: %d bytes%s"), ESP.getFreeHeap(), FPSTR(EOL));
+    client.printf_P(PSTR("Free: %d bytes%s"), ESP.getFreeHeap(), FPCC(EOL));
 #else
-    client.printf_P(PSTR("Free: %d bytes Fragmentation: %d%%%s"), ESP.getFreeHeap(), ESP.getHeapFragmentation(), FPSTR(EOL));
+    client.printf_P(PSTR("Free: %d bytes Fragmentation: %d%%%s"), ESP.getFreeHeap(), ESP.getHeapFragmentation(), FPCC(EOL));
 #endif
-  } else if (cmd.equals(PSTR("$NET"))) {
+  } else if (cmd.equals(F("$NET"))) {
     client.println(get_net_info());
-  } else if (cmd.equals(PSTR("$WIF"))) {
+  } else if (cmd.equals(F("$WIF"))) {
     WiFi.printDiag(client);
-    client.printf_P(PSTR("BSSID: %s%s"), WiFi.BSSIDstr().c_str(), FPSTR(EOL));
-    client.printf_P(PSTR("RSSI: %d dBm (%d%%)%s"), WiFi.RSSI(), rssi_to_percent(WiFi.RSSI()), FPSTR(EOL));
+    client.printf_P(PSTR("BSSID: %s%s"), WiFi.BSSIDstr().c_str(), FPCC(EOL));
+    client.printf_P(PSTR("RSSI: %d dBm (%d%%)%s"), WiFi.RSSI(), rssi_to_percent(WiFi.RSSI()), FPCC(EOL));
 #if LWIP_VERSION_MAJOR >= 2 
-  } else if (cmd.equals(PSTR("$PNG"))) {
-    client.printf_P(PSTR("PingAlive tx %5d rx %5d%s"), ping_seq_num_send, ping_seq_num_recv, FPSTR(EOL));
+  } else if (cmd.equals(F("$PNG"))) {
+    client.printf_P(PSTR("PingAlive tx %5d rx %5d%s"), ping_seq_num_send, ping_seq_num_recv, FPCC(EOL));
 #endif
-  } else if (cmd.equals(PSTR("$UPD"))) {
-    client.printf_P(PSTR("Update ESP via %s%s"), esp_update_url, FPSTR(EOL));
+  } else if (cmd.equals(F("$UPD"))) {
+    client.printf_P(PSTR("Update ESP via %s%s"), FPCC(esp_update_url), FPCC(EOL));
     do_http_update(client);
-  } else if (cmd.equals(PSTR("$RST ESP"))) {
-    // client.println(F("Restarting ESP..."));
-    // ESP.restart();
-    client.println(F("Resetting ESP..."));
+  } else if (cmd.equals(F("$RST ESP"))) {
+    client.println(F("ESP reset"));
+    delay(100);
     ESP.reset();
-  } else if (cmd.equals(PSTR("$RST OTGW"))) {
-    client.println(F("Resetting OTGW..."));
+  } else if (cmd.equals(F("$RST OTGW"))) {
+    client.println(F("OTGW reset"));
     reset_otgw();
-  } else if (cmd.equals(PSTR("$HLP"))) {
+    client.println(F("OTGW reset complete"));
+  } else if (cmd.equals(F("$HLP"))) {
     client.println(FPSTR(USAGE));
   } else {
     client.println(FPSTR(USAGE));
