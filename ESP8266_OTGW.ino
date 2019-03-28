@@ -140,7 +140,9 @@ void connect_to_wifi() {
   delay(200);
   
   WiFi.mode(WIFI_STA);
-  WiFi.setSleepMode(WIFI_NONE_SLEEP);
+  // Sleep is buggy in core 2.4, disable for now
+  // https://github.com/arendst/Sonoff-Tasmota/blob/development/sonoff/support_wifi.ino#L184
+  // WiFi.setSleepMode(WIFI_NONE_SLEEP);
 #ifdef WIFI_BSSID
   uint8_t *bssid = new uint8_t[6];
   if (bssid) {
