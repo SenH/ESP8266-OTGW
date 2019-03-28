@@ -10,6 +10,7 @@
 #include "ESP8266HTTPClient.h"
 #include "ESP8266httpUpdate.h"
 #include "Wire.h"
+#include "Ticker.h"
 
 int rssi_to_percent(float rssi);
 
@@ -56,6 +57,9 @@ static const byte node_led_pin PROGMEM                  = 16;
 static const byte otgw_reset_pin PROGMEM                = 14;
 static const byte wd_i2c_address PROGMEM                = 38;
 
+Ticker ticker_uptime;
+unsigned long uptime = 0; // Counting every second until 4294967295 = 130 year
+
 WiFiServer otgw_server(port);
 WiFiServer esp_server(port + 1);
 
@@ -70,7 +74,7 @@ unsigned long wd2_timer                                 = 0;
 static const unsigned long wd2_interval PROGMEM         = 1000;
 
 static const char EOL[] PROGMEM                         = "\r\n";
-static const char USAGE[] PROGMEM                       = "$VER $MEM $NET $WIF $PNG $UPD $RST ESP|OTGW $HLP";
+static const char USAGE[] PROGMEM                       = "$SYS $MEM $NET $WIF $PNG $UPD $RST ESP|OTGW $HLP";
 
 // 
 // FUNCTIONS
@@ -259,10 +263,10 @@ void parse_esp_cmd(WiFiClient client) {
     return;
   }
   
-  if (cmd.equals(F("$VER"))) {
+  if (cmd.equals(F("$SYS"))) {
     client.println(ESP.getFullVersion());
-    client.print(F("ESP restart reason: "));
-    client.println(ESP.getResetReason());
+    client.printf_P(PSTR("       Uptime : %lu seconds%s"), uptime, FPCC(EOL));
+    client.printf_P(PSTR("Restart reason: %s%s"), ESP.getResetReason().c_str(), FPCC(EOL));
   } else if (cmd.equals(F("$MEM"))) {
 #ifdef ARDUINO_ESP8266_RELEASE_2_4_2
     client.printf_P(PSTR("Free: %d bytes%s"), ESP.getFreeHeap(), FPCC(EOL));
@@ -297,11 +301,18 @@ void parse_esp_cmd(WiFiClient client) {
   }
 }
 
+void uptime_inc() {
+  uptime++;
+}
+
 // 
 // MAIN
 // 
 
 void setup(void) {
+  // Increment uptime every second
+  ticker_uptime.attach(1.0, uptime_inc);
+
   Serial.begin(baud_rate);
   s_println(ESP.getFullVersion());
   s_print(F("ESP > Restart reason: "));

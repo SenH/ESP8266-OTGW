@@ -25,7 +25,7 @@ Arduino application for [ESP8266](https://arduino-esp8266.readthedocs.io/en/late
 
 Command | Usage
 ------- | -----
-`$VER` | Display ESP Arduino version info
+`$SYS` | Display ESP Arduino version info, uptime & last restart reason
 `$MEM` | Display free memory & fragmentation
 `$NET` | Display IP, Subnet, Gateway, DNS and MAC address
 `$WIF` | display WiFi diagnostics
