@@ -19,9 +19,11 @@
 #ifdef SERIAL_PRINT
   #define s_print(x) Serial.print(x)
   #define s_println(x) Serial.println(x)
+  #define s_printf_P(...) Serial.printf_P(__VA_ARGS__)
 #else
   #define s_print(x)
   #define s_println(x)
+  #define s_printf_P(...)
 #endif
 
 #ifdef USE_WATCHDOG
@@ -75,7 +77,7 @@ static const char USAGE[] PROGMEM                       = "$VER $MEM $NET $WIF $
 #if LWIP_VERSION_MAJOR >= 2 
 void pingFault ()
 {
-  s_println(F("Gateway not responding to pingAlive"));
+  s_println(F("PNG > Gateway not responding to pingAlive"));
 }
 #endif
 
@@ -86,9 +88,9 @@ void reset_wd_i2c() {
   ret = Wire.endTransmission();
 
   if (ret == 0) {
-    s_println(F("Reset WDT_I2C"));
+    s_println(F("WD > Reset WDT_I2C"));
   } else {
-    s_println(F("Failed reset WDT_I2C"));
+    s_println(F("WD > Failed reset WDT_I2C"));
   }
 }
 
@@ -105,7 +107,7 @@ void reset_otgw() {
   delay(500);
   digitalWrite(otgw_reset_pin, HIGH);
   pinMode(otgw_reset_pin, INPUT_PULLUP);
-  s_println(F("Reset OTGW"));
+  s_println(F("OTGW > Reset complete"));
 }
 
 String get_net_info() {
@@ -132,6 +134,7 @@ String get_net_info() {
 
 void connect_to_wifi() {
   // https://github.com/arendst/Sonoff-Tasmota/blob/development/sonoff/support_wifi.ino#L210
+  s_println(F("WiFi > Initialize"));
   WiFi.persistent(false);
   WiFi.disconnect(true);
   delay(200);
@@ -155,7 +158,7 @@ void connect_to_wifi() {
   wifi_connect_timer = millis();
   while (WiFi.status() != WL_CONNECTED) {
     unsigned long now = millis();
-    s_println(F("Connecting to WiFi"));
+    s_println(F("WiFi > Connecting..."));
     s_trig_reset_wd_i2c(now);
     s_wd_reset();
 
@@ -166,16 +169,19 @@ void connect_to_wifi() {
 
     // Reset ESP after timeout
     if (now - wifi_connect_timer >= wifi_connect_timeout) {
-      s_println(F("Failed connecting to WiFi!"));
-      s_println(F("Resetting ESP..."));
+      s_printf_P(PSTR("WiFi > Failed connecting after %d seconds!"), (wifi_connect_timeout / 1000));
+      s_println(F("ESP > Reset now"));
       ESP.reset();
     }
   }
   
-  s_println(F("WiFi connected!"));
+  s_printf_P(PSTR("WiFi > Connected after %d seconds%s"), (millis() - wifi_connect_timer) / 1000, FPCC(EOL));
 #ifdef SERIAL_PRINT
   WiFi.printDiag(Serial);
 #endif
+  s_printf_P(PSTR("BSSID: %s%s"), WiFi.BSSIDstr().c_str(), FPCC(EOL));
+  s_printf_P(PSTR("RSSI: %d dBm (%d%%)%s"), WiFi.RSSI(), rssi_to_percent(WiFi.RSSI()), FPCC(EOL));
+  s_println(get_net_info());
 }
 
 void handle_server_clients(WiFiServer server, WiFiClient clients[]) {
@@ -188,7 +194,7 @@ void handle_server_clients(WiFiServer server, WiFiClient clients[]) {
           clients[i].stop();
         }
         clients[i] = server.available();
-        s_print(F("New client: "));
+        s_print(F("SRV > New client: "));
         s_println(i);
         break;
       }
@@ -197,7 +203,7 @@ void handle_server_clients(WiFiServer server, WiFiClient clients[]) {
     if (i == max_clients) {
       WiFiClient a_client = server.available();
       a_client.stop();
-      s_println(F("Max clients exceeded. Rejecting!"));
+      s_println(F("SRV > Max clients exceeded. Rejecting!"));
     }
   }
 }
@@ -294,10 +300,12 @@ void parse_esp_cmd(WiFiClient client) {
 void setup(void) {
   Serial.begin(baud_rate);
   s_println(ESP.getFullVersion());
+  s_print(F("ESP > Restart reason: "));
+  s_println(ESP.getResetReason());
   
 #ifdef USE_WATCHDOG
   wd_enable(1000);
-  s_println(F("Enable ESP8266 WD"));
+  s_println(F("WD > Enable ESP8266 WD"));
 #endif
 
 #ifdef USE_WATCHDOG_I2C
@@ -352,7 +360,7 @@ void loop(void) {
           esp_clients[i].stop();
         }
         esp_clients[i] = esp_server.available();
-        s_print(F("New client: "));
+        s_print(F("SRV > New client: "));
         s_println(i);
         break;
       }
@@ -361,7 +369,7 @@ void loop(void) {
     if (i == max_clients) {
       WiFiClient a_client = esp_server.available();
       a_client.stop();
-      s_println(F("Max clients exceeded. Rejecting!"));
+      s_println(F("SRV > Max clients exceeded. Rejecting!"));
     }
   }
   
@@ -374,7 +382,7 @@ void loop(void) {
           otgw_clients[i].stop();
         }
         otgw_clients[i] = otgw_server.available();
-        s_print(F("New client: "));
+        s_print(F("SRV > New client: "));
         s_println(i);
         break;
       }
@@ -383,7 +391,7 @@ void loop(void) {
     if (i == max_clients) {
       WiFiClient a_client = otgw_server.available();
       a_client.stop();
-      s_println(F("Max clients exceeded. Rejecting!"));
+      s_println(F("SRV > Max clients exceeded. Rejecting!"));
     }
   }
   
