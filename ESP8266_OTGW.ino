@@ -11,6 +11,8 @@
 #include "ESP8266httpUpdate.h"
 #include "Wire.h"
 
+int rssi_to_percent(float rssi);
+
 #if LWIP_VERSION_MAJOR >= 2 
 // https://github.com/esp8266/Arduino/issues/2330#issuecomment-431280122
 #include "PingAlive.h"
@@ -19,7 +21,7 @@
 #ifdef SERIAL_PRINT
   #define s_print(x) Serial.print(x)
   #define s_println(x) Serial.println(x)
-  #define s_printf_P(...) Serial.printf_P(__VA_ARGS__)
+  #define s_printf_P(format,...) Serial.printf_P(format, __VA_ARGS__)
 #else
   #define s_print(x)
   #define s_println(x)
