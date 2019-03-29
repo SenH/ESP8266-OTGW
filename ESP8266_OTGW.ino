@@ -58,7 +58,8 @@ static const byte otgw_reset_pin PROGMEM                = 14;
 static const byte wd_i2c_address PROGMEM                = 38;
 
 Ticker ticker_uptime;
-unsigned long uptime = 0; // Counting every second until 4294967295 = 130 year
+unsigned long uptime                                    = 0; // Counting every second until 4294967295 = 130 years
+unsigned long wifi_connect_ts                           = 0;
 
 WiFiServer otgw_server(port);
 WiFiServer esp_server(port + 1);
@@ -183,6 +184,7 @@ void connect_to_wifi() {
     }
   }
   
+  wifi_connect_ts = uptime;
   s_printf_P(PSTR("WiFi > Connected after %d seconds%s"), (millis() - wifi_connect_timer) / 1000, FPCC(EOL));
 #ifdef SERIAL_PRINT
   WiFi.printDiag(Serial);
@@ -265,7 +267,8 @@ void parse_esp_cmd(WiFiClient client) {
   
   if (cmd.equals(F("$SYS"))) {
     client.println(ESP.getFullVersion());
-    client.printf_P(PSTR("       Uptime : %lu seconds%s"), uptime, FPCC(EOL));
+    client.printf_P(PSTR("    ESP uptime: %lu seconds%s"), uptime, FPCC(EOL));
+    client.printf_P(PSTR("   WiFi uptime: %lu seconds%s"), (uptime-wifi_connect_ts), FPCC(EOL));
     client.printf_P(PSTR("Restart reason: %s%s"), ESP.getResetReason().c_str(), FPCC(EOL));
   } else if (cmd.equals(F("$MEM"))) {
 #ifdef ARDUINO_ESP8266_RELEASE_2_4_2
