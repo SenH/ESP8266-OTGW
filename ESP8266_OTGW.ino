@@ -75,7 +75,7 @@ unsigned long wd2_timer                                 = 0;
 static const unsigned long wd2_interval PROGMEM         = 1000;
 
 static const char EOL[] PROGMEM                         = "\r\n";
-static const char USAGE[] PROGMEM                       = "$SYS $MEM $NET $WIF $PNG $UPD $RST ESP|OTGW $HLP";
+static const char USAGE[] PROGMEM                       = "$SYS $MEM $NET $WIF $PNG $UPD $RST ESP|OTGW $EXT $HLP";
 
 // 
 // FUNCTIONS
@@ -297,6 +297,9 @@ void parse_esp_cmd(WiFiClient client) {
     client.println(F("OTGW reset"));
     reset_otgw();
     client.println(F("OTGW reset complete"));
+  } else if (cmd.equals(F("$EXT"))) {
+    client.println(F("Goodbye..."));
+    client.stop();
   } else if (cmd.equals(F("$HLP"))) {
     client.println(FPSTR(USAGE));
   } else {
