@@ -220,9 +220,6 @@ void handle_server_clients(WiFiServer server, WiFiClient clients[]) {
 
 // https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266httpUpdate/examples/httpUpdate/httpUpdate.ino
 void do_http_update(WiFiClient client) {
-  // reboot on update calls ESP.restart() which results in exception 3
-  // https://github.com/arendst/Sonoff-Tasmota/blob/f7c30250c10a49bcf6b20e501a7df6afb3e24703/sonoff/support_wifi.ino#L615
-  ESPhttpUpdate.rebootOnUpdate(false);
 #ifdef ARDUINO_ESP8266_RELEASE_2_4_2
   t_httpUpdate_return ret = ESPhttpUpdate.update(FPCC(esp_update_url));
 #else
@@ -243,8 +240,6 @@ void do_http_update(WiFiClient client) {
 
     case HTTP_UPDATE_OK:
     client.println(F("HTTP update OK"));
-    delay(1000);
-    ESP.reset();
     break;
   }
 }
@@ -355,10 +350,7 @@ void setup(void) {
 #endif
  
   esp_server.begin();
-  esp_server.setNoDelay(true);
-
   otgw_server.begin();
-  otgw_server.setNoDelay(true);
 }
 
 void loop(void) {
