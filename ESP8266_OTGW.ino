@@ -38,9 +38,13 @@ int rssi_to_percent(float rssi);
 // Retrieve const char* from PROGMEM pointer
 #define FPCC(x) (String(FPSTR(x)).c_str())
 
+#define STACK_PROTECTOR  512 // bytes
+
 // 
 // GLOBALS
 // 
+
+Ticker t_uptime;
 
 static const byte port PROGMEM                          = 23;
 static const byte max_clients PROGMEM                   = 2;
@@ -51,7 +55,6 @@ static const byte node_led_pin PROGMEM                  = 16;
 static const byte otgw_reset_pin PROGMEM                = 14;
 static const byte wd_i2c_address PROGMEM                = 38;
 
-Ticker ticker_uptime;
 unsigned long uptime                                    = 0; // Counting every second until 4294967295 = 130 years
 unsigned long wifi_connect_ts                           = 0;
 
@@ -60,7 +63,6 @@ WiFiServer esp_server(port + 1);
 
 WiFiClient otgw_clients[max_clients];
 WiFiClient esp_clients[max_clients];
-int wifi_led                                            = HIGH;
 
 unsigned long wifi_connect_timer                        = 0;
 static const unsigned long wifi_connect_timeout PROGMEM = 60000;
@@ -70,6 +72,7 @@ static const unsigned long wd2_interval PROGMEM         = 1000;
 
 static const char EOL[] PROGMEM                         = "\r\n";
 static const char USAGE[] PROGMEM                       = "$SYS $MEM $NET $WIF $UPD $RST ESP|OTGW $EXT $HLP";
+static const char ERR_SERVER_BUSY[] PROGMEM             = "Server is busy with %d active connections%s";
 
 // 
 // FUNCTIONS
@@ -151,15 +154,14 @@ void connect_to_wifi() {
     s_wd_reset();
 
     // Toggle LED
-    wifi_led = (wifi_led == LOW) ? HIGH : LOW;
-    digitalWrite(esp_led_pin, wifi_led);
+    digitalWrite(esp_led_pin, !digitalRead(esp_led_pin));
     delay(500);
 
-    // Reset ESP after timeout
+    // Restart ESP after timeout
     if (now - wifi_connect_timer >= wifi_connect_timeout) {
-      s_printf_P(PSTR("WiFi > Failed connecting after %d seconds!"), (wifi_connect_timeout / 1000));
-      s_println(F("ESP > Reset now"));
-      ESP.reset();
+      s_printf_P(PSTR("WiFi > Failed connecting after %d seconds!%s"), (wifi_connect_timeout / 1000), FPCC(EOL));
+      s_println(F("ESP > Restart now"));
+      ESP.restart();
     }
   }
   
@@ -171,30 +173,6 @@ void connect_to_wifi() {
   s_printf_P(PSTR("BSSID: %s%s"), WiFi.BSSIDstr().c_str(), FPCC(EOL));
   s_printf_P(PSTR("RSSI: %d dBm (%d%%)%s"), WiFi.RSSI(), rssi_to_percent(WiFi.RSSI()), FPCC(EOL));
   s_println(get_net_info());
-}
-
-void handle_server_clients(WiFiServer server, WiFiClient clients[]) {
-  uint8_t i;
-  if (server.hasClient()) {
-    for (i = 0; i < max_clients; i++) {
-      // Find free spot
-      if (!clients[i] || !clients[i].connected()) {
-        if (clients[i]) {
-          clients[i].stop();
-        }
-        clients[i] = server.available();
-        s_print(F("SRV > New client: "));
-        s_println(i);
-        break;
-      }
-    }
-    // No free spot so reject
-    if (i == max_clients) {
-      WiFiClient a_client = server.available();
-      a_client.stop();
-      s_println(F("SRV > Max clients exceeded. Rejecting!"));
-    }
-  }
 }
 
 // https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266httpUpdate/examples/httpUpdate/httpUpdate.ino
@@ -242,7 +220,7 @@ void parse_esp_cmd(WiFiClient client) {
   
   if (cmd.equals(F("$SYS"))) {
 #ifdef SKETCH_VERSION
-    client.printf_P(PSTR("Sketch: %s%s"), SKETCH_VERSION, FPCC(EOL));
+    client.printf_P(PSTR("Sketch:%s/"), SKETCH_VERSION);
 #endif
     client.println(ESP.getFullVersion());
     client.printf_P(PSTR("    ESP uptime: %lu seconds%s"), uptime, FPCC(EOL));
@@ -260,13 +238,12 @@ void parse_esp_cmd(WiFiClient client) {
     client.printf_P(PSTR("Update ESP via %s%s"), FPCC(esp_update_url), FPCC(EOL));
     do_http_update(client);
   } else if (cmd.equals(F("$RST ESP"))) {
-    client.println(F("ESP reset"));
-    delay(100);
-    ESP.reset();
+    client.println(F("ESP > Restart"));
+    ESP.restart();
   } else if (cmd.equals(F("$RST OTGW"))) {
-    client.println(F("OTGW reset"));
+    client.println(F("OTGW > Reset"));
     reset_otgw();
-    client.println(F("OTGW reset complete"));
+    client.println(F("OTGW > Reset complete"));
   } else if (cmd.equals(F("$EXT"))) {
     client.println(F("Goodbye..."));
     client.stop();
@@ -283,13 +260,17 @@ void uptime_inc() {
 
 // 
 // MAIN
+// https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WiFi/examples/WiFiTelnetToSerial/WiFiTelnetToSerial.ino
 // 
 
 void setup(void) {
   // Increment uptime every second
-  ticker_uptime.attach(1.0, uptime_inc);
+  t_uptime.attach(1.0, uptime_inc);
 
   Serial.begin(baud_rate);
+#ifdef SKETCH_VERSION
+  s_printf_P(PSTR("\nSketch:%s/"), SKETCH_VERSION);
+#endif
   s_println(ESP.getFullVersion());
   s_print(F("ESP > Restart reason: "));
   s_println(ESP.getResetReason());
@@ -303,10 +284,9 @@ void setup(void) {
   Wire.begin();
 #endif
 
-  // Set LEDS OFF
   pinMode(esp_led_pin, OUTPUT);
   pinMode(node_led_pin, OUTPUT);
-
+  // Set LEDS OFF
   digitalWrite(esp_led_pin, HIGH);
   digitalWrite(node_led_pin, HIGH);
   
@@ -339,10 +319,7 @@ void loop(void) {
   if (esp_server.hasClient()) {
     for (i = 0; i < max_clients; i++) {
       // Find free spot
-      if (!esp_clients[i] || !esp_clients[i].connected()) {
-        if (esp_clients[i]) {
-          esp_clients[i].stop();
-        }
+      if (!esp_clients[i]) {
         esp_clients[i] = esp_server.available();
         s_print(F("SRV > New client: "));
         s_println(i);
@@ -352,19 +329,23 @@ void loop(void) {
     // No free spot so reject
     if (i == max_clients) {
       WiFiClient a_client = esp_server.available();
-      a_client.stop();
+      a_client.printf_P(FPCC(ERR_SERVER_BUSY), max_clients, FPCC(EOL));
       s_println(F("SRV > Max clients exceeded. Rejecting!"));
     }
   }
   
+  // ESP commands
+  for (i = 0; i < max_clients; i++) {
+    while (esp_clients[i].available()) {
+      parse_esp_cmd(esp_clients[i]);
+    }
+  }
+
   // Get new OTGW clients
   if (otgw_server.hasClient()) {
     for (i = 0; i < max_clients; i++) {
       // Find free spot
-      if (!otgw_clients[i] || !otgw_clients[i].connected()) {
-        if (otgw_clients[i]) {
-          otgw_clients[i].stop();
-        }
+      if (!otgw_clients[i]) {
         otgw_clients[i] = otgw_server.available();
         s_print(F("SRV > New client: "));
         s_println(i);
@@ -374,55 +355,60 @@ void loop(void) {
     // No free spot so reject
     if (i == max_clients) {
       WiFiClient a_client = otgw_server.available();
-      a_client.stop();
+      a_client.printf_P(FPCC(ERR_SERVER_BUSY), max_clients, FPCC(EOL));
       s_println(F("SRV > Max clients exceeded. Rejecting!"));
     }
   }
   
-  // handle_server_clients(esp_server, esp_clients);
-  // handle_server_clients(otgw_server, otgw_clients);
-  
-  // ESP commands
-  for (i = 0; i < max_clients; i++) {
-    // https://github.com/esp8266/Arduino/issues/5257#issuecomment-430950163
-   while (esp_clients[i] && esp_clients[i].available()) {
-      if (esp_clients[i].available()) {
-        parse_esp_cmd(esp_clients[i]);
-      }
-    }
-  }
-
   // OTGW Telnet -> Serial
   for (i = 0; i < max_clients; i++) {
-    // https://github.com/esp8266/Arduino/issues/5257#issuecomment-430950163
-   while (otgw_clients[i] && otgw_clients[i].available()) {
+    while (otgw_clients[i].available() && Serial.availableForWrite() > 0) {
       if (otgw_clients[i].available()) {
-        while (otgw_clients[i].available()) {
-          Serial.write(otgw_clients[i].read());
-          Serial.flush(); // Wait for transmit to finish
-          digitalWrite(node_led_pin, LOW);
-          delay(1);
-        }
-      } else {
-        digitalWrite(node_led_pin, HIGH);
+        Serial.write(otgw_clients[i].read());
+        Serial.flush(); // Wait for transmit to finish
+        digitalWrite(node_led_pin, !digitalRead(node_led_pin));
+        delay(1); // Increases LED ON time
       }
     }
   }
 
   // OTGW Serial -> Telnet
-  if (Serial.available()) {
-    size_t len = Serial.available();
-    uint8_t sbuf[len];
-    Serial.readBytes(sbuf, len);
-
-    for (i = 0; i < max_clients; i++) {
-    // https://github.com/esp8266/Arduino/issues/5257#issuecomment-430950163
-      if (otgw_clients[i] && otgw_clients[i].connected()) {
-        digitalWrite(esp_led_pin, LOW);
-        otgw_clients[i].write(sbuf, len);
-        delay(1);
+  size_t maxToTcp = 0;
+  for (int i = 0; i < max_clients; i++) {
+    // Determine maximum output size "fair TCP use"
+    if (otgw_clients[i]) {
+      size_t afw = otgw_clients[i].availableForWrite();
+      if (afw) {
+        if (!maxToTcp) {
+          maxToTcp = afw;
+        } else {
+          maxToTcp = std::min(maxToTcp, afw);
+        }
       } else {
-        digitalWrite(esp_led_pin, HIGH);
+        // warn but ignore congested clients
+        s_println(F("SRV > One client is congested"));
+      }
+    }
+
+    size_t len = std::min((size_t)Serial.available(), maxToTcp);
+    len = std::min(len, (size_t)STACK_PROTECTOR);
+    if (len) {
+      uint8_t sbuf[len];
+      size_t serial_got = Serial.readBytes(sbuf, len);
+      // push UART data to all connected telnet clients
+      for (int i = 0; i < max_clients; i++) {
+        // if client.availableForWrite() was 0 (congested)
+        // and increased since then,
+        // ensure write space is sufficient:
+        if (otgw_clients[i].availableForWrite() >= serial_got) {
+          digitalWrite(esp_led_pin, !digitalRead(esp_led_pin));
+          size_t tcp_sent = otgw_clients[i].write(sbuf, serial_got);
+          if (tcp_sent != len) {
+            s_printf_P(PSTR("WiFi > len mismatch: available:%zd serial-read:%zd tcp-write:%zd%s"), 
+                            len, serial_got, tcp_sent, FPCC(EOL));
+          }
+          delay(1); // Increases LED ON time
+        }
       }
     }
   }
