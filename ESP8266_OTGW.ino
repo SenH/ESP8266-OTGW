@@ -14,7 +14,7 @@
 
 int rssi_to_percent(float rssi);
 
-#if LWIP_VERSION_MAJOR >= 2 
+#if LWIP_VERSION_MAJOR >= 2  && defined(PING_ALIVE)
 // https://github.com/esp8266/Arduino/issues/2330#issuecomment-431280122
 #include "PingAlive.h"
 #endif
@@ -81,7 +81,7 @@ static const char USAGE[] PROGMEM                       = "$SYS $MEM $NET $WIF $
 // FUNCTIONS
 // 
 
-#if LWIP_VERSION_MAJOR >= 2 
+#if LWIP_VERSION_MAJOR >= 2  && defined(PING_ALIVE)
 void pingFault ()
 {
   s_println(F("PNG > Gateway not responding to pingAlive"));
@@ -282,9 +282,11 @@ void parse_esp_cmd(WiFiClient client) {
     WiFi.printDiag(client);
     client.printf_P(PSTR("BSSID: %s%s"), WiFi.BSSIDstr().c_str(), FPCC(EOL));
     client.printf_P(PSTR("RSSI: %d dBm (%d%%)%s"), WiFi.RSSI(), rssi_to_percent(WiFi.RSSI()), FPCC(EOL));
-#if LWIP_VERSION_MAJOR >= 2 
   } else if (cmd.equals(F("$PNG"))) {
+#if LWIP_VERSION_MAJOR >= 2  && defined(PING_ALIVE)
     client.printf_P(PSTR("PingAlive tx %5d rx %5d%s"), ping_seq_num_send, ping_seq_num_recv, FPCC(EOL));
+#else
+    client.println(F("PingAlive inactive"));
 #endif
   } else if (cmd.equals(F("$UPD"))) {
     client.printf_P(PSTR("Update ESP via %s%s"), FPCC(esp_update_url), FPCC(EOL));
@@ -345,7 +347,7 @@ void setup(void) {
 #endif
 
   connect_to_wifi();
-#if LWIP_VERSION_MAJOR >= 2 
+#if LWIP_VERSION_MAJOR >= 2  && defined(PING_ALIVE)
   startPingAlive();
 #endif
  
