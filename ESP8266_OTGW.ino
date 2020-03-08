@@ -4,7 +4,6 @@
 
 #include "Config.h"
 
-#include "lwip/init.h"
 #include "core_version.h"
 #include "ESP8266WiFi.h"
 #include "ESP8266HTTPClient.h"
@@ -13,11 +12,6 @@
 #include "Ticker.h"
 
 int rssi_to_percent(float rssi);
-
-#if LWIP_VERSION_MAJOR >= 2  && defined(PING_ALIVE)
-// https://github.com/esp8266/Arduino/issues/2330#issuecomment-431280122
-#include "PingAlive.h"
-#endif
 
 #ifdef SERIAL_PRINT
   #define s_print(x) Serial.print(x)
@@ -75,18 +69,11 @@ unsigned long wd2_timer                                 = 0;
 static const unsigned long wd2_interval PROGMEM         = 1000;
 
 static const char EOL[] PROGMEM                         = "\r\n";
-static const char USAGE[] PROGMEM                       = "$SYS $MEM $NET $WIF $PNG $UPD $RST ESP|OTGW $EXT $HLP";
+static const char USAGE[] PROGMEM                       = "$SYS $MEM $NET $WIF $UPD $RST ESP|OTGW $EXT $HLP";
 
 // 
 // FUNCTIONS
 // 
-
-#if LWIP_VERSION_MAJOR >= 2  && defined(PING_ALIVE)
-void pingFault ()
-{
-  s_println(F("PNG > Gateway not responding to pingAlive"));
-}
-#endif
 
 void reset_wd_i2c() {
   int ret = -1;
@@ -282,12 +269,6 @@ void parse_esp_cmd(WiFiClient client) {
     WiFi.printDiag(client);
     client.printf_P(PSTR("BSSID: %s%s"), WiFi.BSSIDstr().c_str(), FPCC(EOL));
     client.printf_P(PSTR("RSSI: %d dBm (%d%%)%s"), WiFi.RSSI(), rssi_to_percent(WiFi.RSSI()), FPCC(EOL));
-  } else if (cmd.equals(F("$PNG"))) {
-#if LWIP_VERSION_MAJOR >= 2  && defined(PING_ALIVE)
-    client.printf_P(PSTR("PingAlive tx %5d rx %5d%s"), ping_seq_num_send, ping_seq_num_recv, FPCC(EOL));
-#else
-    client.println(F("PingAlive inactive"));
-#endif
   } else if (cmd.equals(F("$UPD"))) {
     client.printf_P(PSTR("Update ESP via %s%s"), FPCC(esp_update_url), FPCC(EOL));
     do_http_update(client);
@@ -347,10 +328,6 @@ void setup(void) {
 #endif
 
   connect_to_wifi();
-#if LWIP_VERSION_MAJOR >= 2  && defined(PING_ALIVE)
-  startPingAlive();
-#endif
- 
   esp_server.begin();
   otgw_server.begin();
 }

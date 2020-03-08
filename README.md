@@ -29,7 +29,6 @@ Command | Usage
 `$MEM` | Display free memory & fragmentation
 `$NET` | Display IP, Subnet, Gateway, DNS and MAC address
 `$WIF` | display WiFi diagnostics
-`$PNG` | Display PingAlive RX and TX
 `$UPD` | Update ESP firmware 
 `$RST ESP` | Reset ESP
 `$RST OTGW` | Reset OTGW
