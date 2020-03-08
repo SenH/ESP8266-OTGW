@@ -241,6 +241,9 @@ void parse_esp_cmd(WiFiClient client) {
   }
   
   if (cmd.equals(F("$SYS"))) {
+#ifdef SKETCH_VERSION
+    client.printf_P(PSTR("Sketch: %s%s"), SKETCH_VERSION, FPCC(EOL));
+#endif
     client.println(ESP.getFullVersion());
     client.printf_P(PSTR("    ESP uptime: %lu seconds%s"), uptime, FPCC(EOL));
     client.printf_P(PSTR("   WiFi uptime: %lu seconds%s"), (uptime-wifi_connect_ts), FPCC(EOL));
