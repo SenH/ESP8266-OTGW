@@ -140,15 +140,15 @@ String get_net_info() {
 }
 
 void connect_to_wifi() {
-  // https://github.com/arendst/Sonoff-Tasmota/blob/development/sonoff/support_wifi.ino#L210
   s_println(F("WiFi > Initialize"));
+  // https://github.com/arendst/Tasmota/blob/development/tasmota/support_wifi.ino#L182
   WiFi.persistent(false);
   WiFi.disconnect(true);
   delay(200);
   
   WiFi.mode(WIFI_STA);
   // Sleep is buggy in core 2.4, disable for now
-  // https://github.com/arendst/Sonoff-Tasmota/blob/development/sonoff/support_wifi.ino#L184
+  // https://github.com/arendst/Tasmota/blob/development/tasmota/support_wifi.ino#L142
   // WiFi.setSleepMode(WIFI_NONE_SLEEP);
 #ifdef WIFI_BSSID
   uint8_t *bssid = new uint8_t[6];
