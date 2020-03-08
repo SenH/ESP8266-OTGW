@@ -128,15 +128,7 @@ String get_net_info() {
 
 void connect_to_wifi() {
   s_println(F("WiFi > Initialize"));
-  // https://github.com/arendst/Tasmota/blob/development/tasmota/support_wifi.ino#L182
-  WiFi.persistent(false);
-  WiFi.disconnect(true);
-  delay(200);
-  
   WiFi.mode(WIFI_STA);
-  // Sleep is buggy in core 2.4, disable for now
-  // https://github.com/arendst/Tasmota/blob/development/tasmota/support_wifi.ino#L142
-  // WiFi.setSleepMode(WIFI_NONE_SLEEP);
 #ifdef WIFI_BSSID
   uint8_t *bssid = new uint8_t[6];
   if (bssid) {
