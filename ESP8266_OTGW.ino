@@ -207,13 +207,9 @@ void handle_server_clients(WiFiServer server, WiFiClient clients[]) {
 
 // https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266httpUpdate/examples/httpUpdate/httpUpdate.ino
 void do_http_update(WiFiClient client) {
-#ifdef ARDUINO_ESP8266_RELEASE_2_4_2
-  t_httpUpdate_return ret = ESPhttpUpdate.update(FPCC(esp_update_url));
-#else
   WiFiClient OTAclient;
   ESPhttpUpdate.setLedPin(node_led_pin, LOW);
   t_httpUpdate_return ret = ESPhttpUpdate.update(OTAclient, FPCC(esp_update_url));
-#endif
   
   switch (ret) {
     case HTTP_UPDATE_FAILED:
@@ -258,11 +254,7 @@ void parse_esp_cmd(WiFiClient client) {
     client.printf_P(PSTR("   WiFi uptime: %lu seconds%s"), (uptime-wifi_connect_ts), FPCC(EOL));
     client.printf_P(PSTR("Restart reason: %s%s"), ESP.getResetReason().c_str(), FPCC(EOL));
   } else if (cmd.equals(F("$MEM"))) {
-#ifdef ARDUINO_ESP8266_RELEASE_2_4_2
-    client.printf_P(PSTR("Free: %d bytes%s"), ESP.getFreeHeap(), FPCC(EOL));
-#else
     client.printf_P(PSTR("Free: %d bytes Fragmentation: %d%%%s"), ESP.getFreeHeap(), ESP.getHeapFragmentation(), FPCC(EOL));
-#endif
   } else if (cmd.equals(F("$NET"))) {
     client.println(get_net_info());
   } else if (cmd.equals(F("$WIF"))) {
