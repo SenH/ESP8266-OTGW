@@ -12,6 +12,7 @@
 #include "Ticker.h"
 
 int rssi_to_percent(float rssi);
+String get_human_uptime(uint32_t uptime);
 
 #ifdef SERIAL_PRINT
   #define s_print(x) Serial.print(x)
@@ -205,6 +206,59 @@ int rssi_to_percent(float rssi) {
   return min(i, 100);
 }
 
+String get_human_uptime(uint32_t uptime) {
+  uint32_t time;
+  uint8_t seconds;
+  uint8_t minutes;
+  uint8_t hours;
+  uint16_t days;
+  
+  time = uptime;
+  seconds = time % 60;
+  time /= 60;   // now it is minutes
+  minutes = time % 60;
+  time /= 60;   // now it is hours
+  hours = time % 24;
+  time /= 24;   // now it is days
+  days = time; 
+
+  String s;
+  s.reserve(32);
+  if (days != 0) {
+    s += days;
+    if (days == 1) {
+      s += F(" day ");
+    } else {
+      s += F(" days ");
+    }
+  }
+  if (hours != 0) {
+    s += hours;
+    if (hours == 1) {
+      s += F(" hour ");
+    } else {
+      s += F(" hours ");
+    }
+  }
+  if (minutes != 0) {
+    s += minutes;
+    if (minutes == 1) {
+      s += F(" minute ");
+    } else {
+      s += F(" minutes ");
+    }
+  } else {
+    s += seconds;
+    if (seconds == 1) {
+      s += F(" second");
+    } else {
+      s += F(" seconds");
+    }
+  }
+  
+  return s;
+}
+
 void parse_esp_cmd(WiFiClient client) {
   String cmd;
   cmd.reserve(16);
@@ -224,8 +278,8 @@ void parse_esp_cmd(WiFiClient client) {
     client.printf_P(PSTR("Sketch:%s/"), SKETCH_VERSION);
 #endif
     client.println(ESP.getFullVersion());
-    client.printf_P(PSTR("    ESP uptime: %lu seconds%s"), uptime, FPCC(EOL));
-    client.printf_P(PSTR("   WiFi uptime: %lu seconds%s"), (uptime-wifi_connect_ts), FPCC(EOL));
+    client.printf_P(PSTR("    ESP uptime: %s%s"), get_human_uptime(uptime).c_str(), FPCC(EOL));
+    client.printf_P(PSTR("   WiFi uptime: %s%s"), get_human_uptime(uptime - wifi_connect_ts).c_str(), FPCC(EOL));
     client.printf_P(PSTR("Restart reason: %s%s"), ESP.getResetReason().c_str(), FPCC(EOL));
   } else if (cmd.equals(F("$MEM"))) {
     client.printf_P(PSTR("Free: %d bytes Fragmentation: %d%%%s"), ESP.getFreeHeap(), ESP.getHeapFragmentation(), FPCC(EOL));
