@@ -211,6 +211,7 @@ void parse_esp_cmd(WiFiClient client) {
 
   client.setTimeout(1); // Max waiting time for readStringUntil()
   cmd = client.readStringUntil('\r');
+  cmd.toUpperCase();
   client.readStringUntil('\n'); // Discard LF
 
   if (cmd.length() < 4) {
