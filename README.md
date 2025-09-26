@@ -32,4 +32,5 @@ Command | Usage
 `$UPD` | Update ESP firmware 
 `$RST ESP` | Reset ESP
 `$RST OTGW` | Reset OTGW
+`$EXT` | Exit Telnet session
 `$HLP` | Display usage
