@@ -27,8 +27,9 @@ Command | Usage
 ------- | -----
 `$SYS` | Display ESP Arduino version info, uptime & last restart reason
 `$MEM` | Display free memory & fragmentation
-`$NET` | Display IP, Subnet, Gateway, DNS and MAC address
-`$WIF` | display WiFi diagnostics
+`$NET` | Display IP, Subnet, Gateway, DNS & MAC address
+`$WIF` | Display WiFi diagnostics
+`$CLN` | List client connections
 `$UPD` | Update ESP firmware 
 `$RST ESP` | Reset ESP
 `$RST OTGW` | Reset OTGW

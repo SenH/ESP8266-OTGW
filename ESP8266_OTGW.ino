@@ -48,7 +48,7 @@ String get_human_uptime(uint32_t uptime);
 Ticker t_uptime;
 
 static const byte port PROGMEM                          = 23;
-static const byte max_clients PROGMEM                   = 2;
+static const byte max_clients PROGMEM                   = 4;
 static const int baud_rate PROGMEM                      = 9600;
 
 static const byte esp_led_pin PROGMEM                   = 2;
@@ -72,8 +72,10 @@ unsigned long wd2_timer                                 = 0;
 static const unsigned long wd2_interval PROGMEM         = 1000;
 
 static const char EOL[] PROGMEM                         = "\r\n";
-static const char USAGE[] PROGMEM                       = "$SYS $MEM $NET $WIF $UPD $RST ESP|OTGW $EXT $HLP";
+static const char USAGE[] PROGMEM                       = "$SYS $MEM $NET $WIF $CLN $UPD $RST ESP|OTGW $EXT $HLP";
 static const char ERR_SERVER_BUSY[] PROGMEM             = "Server is busy with %d active connections%s";
+
+static const char LOG_SERVER_CONN[] PROGMEM             = "SRV > New %s client #%d from %s:%d\r\n";
 
 // 
 // FUNCTIONS
@@ -128,6 +130,17 @@ String get_net_info() {
   s += WiFi.macAddress();
   
   return s;
+}
+
+void print_clients(const char* name, WiFiClient* clients, WiFiClient client) {
+  client.printf_P(PSTR("%s Clients:%s"), name, FPCC(EOL));
+  uint8_t i;
+  for (i = 0; i < max_clients; i++) {
+    if (clients[i]) {
+      client.printf_P(PSTR("\t%d\.\t%s:%d%s"), i+1, clients[i].remoteIP().toString().c_str(), 
+                      clients[i].remotePort(), FPCC(EOL));
+    }
+  }
 }
 
 void connect_to_wifi() {
@@ -289,6 +302,9 @@ void parse_esp_cmd(WiFiClient client) {
     WiFi.printDiag(client);
     client.printf_P(PSTR("BSSID: %s%s"), WiFi.BSSIDstr().c_str(), FPCC(EOL));
     client.printf_P(PSTR("RSSI: %d dBm (%d%%)%s"), WiFi.RSSI(), rssi_to_percent(WiFi.RSSI()), FPCC(EOL));
+  } else if (cmd.equals(F("$CLN"))) {
+    print_clients(PSTR("ESP"), esp_clients, client);
+    print_clients(PSTR("OTGW"), otgw_clients, client);
   } else if (cmd.equals(F("$UPD"))) {
     client.printf_P(PSTR("Update ESP via %s%s"), FPCC(esp_update_url), FPCC(EOL));
     do_http_update(client);
@@ -376,8 +392,7 @@ void loop(void) {
       // Find free spot
       if (!esp_clients[i]) {
         esp_clients[i] = esp_server.available();
-        s_print(F("SRV > New client: "));
-        s_println(i);
+        s_printf_P(FPCC(LOG_SERVER_CONN), F("ESP"), i+1, esp_clients[i].remoteIP().toString().c_str(), esp_clients[i].remotePort());
         break;
       }
     }
@@ -402,8 +417,7 @@ void loop(void) {
       // Find free spot
       if (!otgw_clients[i]) {
         otgw_clients[i] = otgw_server.available();
-        s_print(F("SRV > New client: "));
-        s_println(i);
+        s_printf_P(FPCC(LOG_SERVER_CONN), F("OTGW"), i+1, otgw_clients[i].remoteIP().toString().c_str(), otgw_clients[i].remotePort());
         break;
       }
     }
